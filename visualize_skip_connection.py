@@ -21,9 +21,16 @@ import numpy as np
 import torch
 import matplotlib.pyplot as plt
 from matplotlib.gridspec import GridSpec, GridSpecFromSubplotSpec
+import random
 
 from utils.UNeXt import UNet
 from utils.data_processing import CellDataset
+
+random.seed(42)
+np.random.seed(42)
+torch.manual_seed(42)
+if torch.backends.mps.is_available():
+    torch.mps.manual_seed(42)
 
 # ---------------------------------------------------------------------------
 # Helper functions
@@ -83,9 +90,9 @@ def plot_skip_connection(
     from the three target layers involved in a skip connection.
     """
     titles = {
-        target_layers[0]: "Encoder Output (All Channels from layers_encode.2.3)",
-        target_layers[1]: "Upsampled Decoder Input (All Channels from layers_decode.1.0)",
-        target_layers[2]: "Fused Result (All Channels from layers_decode.1.1.0)",
+        target_layers[0]: "Encoder Output (All Channels from layers_encode.0.3)",
+        target_layers[1]: "Upsampled Decoder Input (All Channels from layers_decode.2.0)",
+        target_layers[2]: "Fused Result (All Channels from layers_decode.2.1.0)",
     }
 
     # Calculate the number of rows needed for each layer's feature maps
@@ -181,7 +188,7 @@ def main() -> None:
     # 2.  Prepare the input sample
     # ---------------------------------------------------------------------
     print(f"[INFO] Using data sample index {args.sample_idx}...")
-    sample = dataset[args.sample_idx]
+    sample = dataset[3]
     for key in sample:
         sample[key] = sample[key].unsqueeze(0).to(device)
 
@@ -191,9 +198,9 @@ def main() -> None:
     # 3.  Collect activations from target layers
     # ---------------------------------------------------------------------
     target_layers = [
-        "layers_encode.2.3",      # Encoder output (spatial detail)
-        "layers_decode.1.0",      # Upsampled output (semantic context)
-        "layers_decode.1.1.0",    # Fused result after ConvNextCell
+        "layers_encode.0.3",      # Encoder output (spatial detail)
+        "layers_decode.2.0",      # Upsampled output (semantic context)
+        "layers_decode.2.1.0",    # Fused result after ConvNextCell
     ]
     print(f"[INFO] Collecting activations from: {target_layers}...")
     activations = collect_activations(model, x, target_layers)

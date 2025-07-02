@@ -17,7 +17,7 @@ import skimage
 
 import os
 
-from utils.UNeXt import UNet
+from utils.tracing_unet import TracingUNet
 from utils.data_processing import CellDataset, SubsetSampler
 
 from utils.nb_utils import *
@@ -46,7 +46,8 @@ modelinfo['dataset_kwargs']['root'] = './data/ZyxAct_16kPa_small/'
 modelinfo['dataset_kwargs']['transform_kwargs']['crop_size'] = 960
 modelinfo['dataset_kwargs']['transform_kwargs']['rotate'] = False
 
-model = UNet(**modelinfo['model_kwargs'], model_idx = 0)
+model = TracingUNet(**modelinfo['model_kwargs'], model_idx = 0)
+model.register_logging_hooks()
 
 model.load_state_dict(modelinfo['model'])
 
@@ -299,75 +300,75 @@ graph = draw_graph(model,
 for name, module in model.named_modules():
     print(name, '→', module.__class__.__name__)
 
-# ------------------------------------------------------------
-# 0.  Prereqs:  model, dataset, and 'device' are already set up
-# ------------------------------------------------------------
-model.eval()                            # make sure BN/Dropout are in eval-mode
+# # ------------------------------------------------------------
+# # 0.  Prereqs:  model, dataset, and 'device' are already set up
+# # ------------------------------------------------------------
+# model.eval()                            # make sure BN/Dropout are in eval-mode
 
-# Pick one sample
-idx = 0                                 # choose any valid index
-sample   = dataset[idx]
-x        = model.select_inputs(model.input_type, sample).to(device).unsqueeze(0)
+# # Pick one sample
+# idx = 0                                 # choose any valid index
+# sample   = dataset[idx]
+# x        = model.select_inputs(model.input_type, sample).to(device).unsqueeze(0)
 
-# ------------------------------------------------------------
-# 1.  Register hooks to grab *every* module output
-# ------------------------------------------------------------
-activations = {}                        # name  ➜ tensor
+# # ------------------------------------------------------------
+# # 1.  Register hooks to grab *every* module output
+# # ------------------------------------------------------------
+# activations = {}                        # name  ➜ tensor
 
-def save_activation(name):
-    def hook(_, __, output):
-        activations[name] = output.detach().cpu()
-    return hook
+# def save_activation(name):
+#     def hook(_, __, output):
+#         activations[name] = output.detach().cpu()
+#     return hook
 
-for name, module in model.named_modules():
-    # If you want only specific layer types, filter here, e.g.:
-    # if isinstance(module, torch.nn.Conv2d):
-    module.register_forward_hook(save_activation(name))
+# for name, module in model.named_modules():
+#     # If you want only specific layer types, filter here, e.g.:
+#     # if isinstance(module, torch.nn.Conv2d):
+#     module.register_forward_hook(save_activation(name))
 
-# ------------------------------------------------------------
-# 2.  Forward pass
-# ------------------------------------------------------------
-with torch.no_grad():
-    _ = model(x)                        # activations{} is filled
+# # ------------------------------------------------------------
+# # 2.  Forward pass
+# # ------------------------------------------------------------
+# with torch.no_grad():
+#     _ = model(x)                        # activations{} is filled
 
-# ------------------------------------------------------------
-# 3.  Visualise or save the feature maps
-# ------------------------------------------------------------
-import os, math, matplotlib.pyplot as plt
+# # ------------------------------------------------------------
+# # 3.  Visualise or save the feature maps
+# # ------------------------------------------------------------
+# import os, math, matplotlib.pyplot as plt
 
-save_dir = "feature_maps"
-os.makedirs(save_dir, exist_ok=True)
+# save_dir = "feature_maps"
+# os.makedirs(save_dir, exist_ok=True)
 
-for layer_name, fmap in activations.items():           # fmap shape = (B,C,H,W)
-    fmap = fmap.squeeze(0)                             # (C,H,W) – batch dim→gone
-    C = fmap.shape[0]
-    ncols = 8                                          # change grid size if needed
-    nrows = math.ceil(C / ncols)
+# for layer_name, fmap in activations.items():           # fmap shape = (B,C,H,W)
+#     fmap = fmap.squeeze(0)                             # (C,H,W) – batch dim→gone
+#     C = fmap.shape[0]
+#     ncols = 8                                          # change grid size if needed
+#     nrows = math.ceil(C / ncols)
 
-    fig, axes = plt.subplots(nrows, ncols,
-                             figsize=(2*ncols, 2*nrows))
-    axes = axes.flatten()
+#     fig, axes = plt.subplots(nrows, ncols,
+#                              figsize=(2*ncols, 2*nrows))
+#     axes = axes.flatten()
 
-    for i in range(C):
-        axes[i].imshow(fmap[i], cmap='viridis')
-        axes[i].set_title(f"ch {i}", fontsize=6)
-        axes[i].axis('off')
+#     for i in range(C):
+#         axes[i].imshow(fmap[i], cmap='viridis')
+#         axes[i].set_title(f"ch {i}", fontsize=6)
+#         axes[i].axis('off')
 
-    # Blank out any unused subplots
-    for j in range(C, len(axes)):
-        axes[j].axis('off')
+#     # Blank out any unused subplots
+#     for j in range(C, len(axes)):
+#         axes[j].axis('off')
 
-    plt.suptitle(layer_name, fontsize=10)
-    plt.tight_layout()
-    plt.subplots_adjust(top=0.92)
+#     plt.suptitle(layer_name, fontsize=10)
+#     plt.tight_layout()
+#     plt.subplots_adjust(top=0.92)
 
-    # Show interactively (comment out if you don't want pop-ups)
-    plt.show()
+#     # Show interactively (comment out if you don't want pop-ups)
+#     plt.show()
 
-    # OR save to file:
-    fig.savefig(os.path.join(save_dir,
-                             f"{layer_name.replace('.', '_')}.png"),
-                dpi=150)
-    plt.close(fig)
+#     # OR save to file:
+#     fig.savefig(os.path.join(save_dir,
+#                              f"{layer_name.replace('.', '_')}.png"),
+#                 dpi=150)
+#     plt.close(fig)
 
 
